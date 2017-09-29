@@ -176,8 +176,8 @@ The function will then use the list of git urls and the `get_repo` method to get
 
 ## Community
 
-If you are interested in participating in BigBang development or would like support from the core development team, please subscribe to [BigBang-user mailing list](https://sudoroom.org/lists/listinfo/bigbang-user) and let us know what your suggestions, questions, requests and comments are. 
+If you are interested in participating in BigBang development or would like support from the core development team, please subscribe to [BigBang-user mailing list](https://lists.ghserv.net/mailman/listinfo/bigbang-dev) and let us know what your suggestions, questions, requests and comments are. 
 
 ## License
 
-GPLv2, see LICENSE for its text.
+AGPL-3.0, see LICENSE for its text. This license may be changed at any time according to the principles of the project [Governance](https://github.com/datactive/bigbang/wiki/Governance).
