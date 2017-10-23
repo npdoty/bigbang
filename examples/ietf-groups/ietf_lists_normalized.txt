@@ -41,7 +41,7 @@ https://www.ietf.org/mail-archive/text/calsify/
 https://www.ietf.org/mail-archive/text/calsify/
 https://www.ietf.org/mail-archive/text/captive-portals/
 https://www.ietf.org/mail-archive/text/casm/
-https://www.ietf.org/mail-archive/web/cbor/current/maillist.html
+https://www.ietf.org/mail-archive/text/cbor/
 https://www.ietf.org/mail-archive/text/ccamp/
 https://www.ietf.org/mail-archive/text/cdni/
 https://www.ietf.org/mail-archive/text/cellar/
@@ -126,11 +126,9 @@ http://www.irtf.org/mail-archive/web/icnrg/
 https://www.ietf.org/mail-archive/text/ideas/
 http://www.alvestrand.no/pipermail/idna-update/
 https://www.ietf.org/mail-archive/text/idr/
-http://www.izerv.net/idwg-public/
 https://www.ietf.org/mail-archive/text/ieprep/
 https://www.ietf.org/mail-archive/text/imapext/
 https://www.ietf.org/mail-archive/text/imapext/
-http://www.imppwg.org
 https://www.ietf.org/mail-archive/text/imss/
 https://www.ietf.org/mail-archive/text/insipid/
 https://www.ietf.org/mail-archive/text/int-area/
@@ -252,7 +250,6 @@ https://www.ietf.org/mail-archive/text/pkix/
 https://www.ietf.org/mail-archive/text/spud/
 https://www.ietf.org/mail-archive/text/pmol/
 https://www.ietf.org/mail-archive/text/pmtud/
-http://www.psc.edu/~mathis/MTU/mbox.txt
 https://www.ietf.org/mail-archive/text/policy/
 https://www.ietf.org/mail-archive/text/posh/
 https://www.ietf.org/mail-archive/text/pppext/

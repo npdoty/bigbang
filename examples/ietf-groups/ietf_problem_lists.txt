@@ -1,0 +1,7 @@
+# troubled lists
+
+http://psg.com/lists/ietf-quality #MHonArc
+http://www.imppwg.org # defunct domain
+http://www.izerv.net/idwg-public/ # defunct domain
+https://lists.anl.gov/pipermail/ietf-krb-wg/ # access denied
+http://www.psc.edu/~mathis/MTU/mbox.txt # defunct?
