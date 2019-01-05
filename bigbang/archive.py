@@ -1,10 +1,11 @@
-import datetime
-import mailman
-import mailbox
-import numpy as np
-from bigbang.thread import Thread
 from bigbang.thread import Node
+from bigbang.thread import Thread
+from config.config import CONFIG
 import bigbang.process as process
+import datetime
+import mailbox
+import mailman
+import numpy as np
 import pandas as pd
 import pytz
 import utils
@@ -16,19 +17,16 @@ def load(path):
 
 
 class Archive(object):
-
-    """
-    A representation of a mailing list archive.
-    """
+    """A representation of a mailing list archive."""
 
     data = None
     activity = None
     threads = None
     entities = None
 
-    def __init__(self, data, archive_dir="archives", mbox=False):
+    def __init__(self, data, archive_dir=CONFIG.mail_path, mbox=False):
         """
-        Initializes an Archive object.
+        Initialize an Archive object.
 
         The behavior of the constructor depends on the type
         of its first argument, data.
@@ -55,8 +53,8 @@ class Archive(object):
         try:
             self.data['Date'] = pd.to_datetime(self.data['Date'], errors='coerce', infer_datetime_format=True, utc=True)
         except:
+            #TODO: writing a CSV file was for debugging purposes, should be removed
             out_path = 'datetime-exception.csv'
-
             with open(out_path, 'w') as f:
                 self.data.to_csv(f, encoding='utf-8')
             
@@ -104,9 +102,12 @@ class Archive(object):
             self.data.sort_values(by='Date', inplace=True)
         except:
             logging.error('Error while sorting, maybe timezone issues?', exc_info=True)
-
+        
+        if self.data.empty:
+            raise mailman.MissingDataException('Archive after initial processing is empty. Was data collected properly?')
 
     def resolve_entities(self,inplace=True):
+        """Return data with resolved entities."""
         if self.entities is None:
             if self.activity is None:
                 self.get_activity()
@@ -136,6 +137,7 @@ class Archive(object):
     def get_activity(self,resolved=False):
         """
         Get the activity matrix of an Archive.
+
         Columns of the returned DataFrame are the Senders of emails.
         Rows are indexed by ordinal date.
         Cells are the number of emails sent by each sender on each data.
@@ -155,6 +157,7 @@ class Archive(object):
         return self.activity
 
     def compute_activity(self, clean=True):
+        """Return the computed activity."""
         mdf = self.data
 
         if clean:
@@ -178,6 +181,7 @@ class Archive(object):
         return activity
 
     def get_threads(self, verbose=False):
+        """Get threads."""
 
         if self.threads is not None:
             return self.threads
@@ -219,12 +223,14 @@ class Archive(object):
         return threads
 
     def save(self, path,encoding='utf-8'):
+        """Save data to csv file."""
         self.data.to_csv(path, ",",encoding=encoding)
 
 
 def find_footer(messages,number=1):
     '''
     Returns the footer of a DataFrame of emails.
+
     A footer is a string occurring at the tail of most messages.
     Messages can be a DataFrame or a Series
     '''

@@ -1,3 +1,4 @@
+cython
 beautifulsoup4
 coverage
 matplotlib
@@ -15,3 +16,6 @@ pip
 scipy
 requests
 pyyaml
+scikit-learn
+nltk
+testfixtures
