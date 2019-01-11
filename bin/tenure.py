@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 import logging
 import argparse
+import enlighten
+import gc
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description=r"""
 Calculates the tenure and total messages sent by each person.
@@ -18,17 +20,24 @@ For example:
 
 python bin/tenure.py --archives ../archives
 
+With the `--combine` parameter, gathers and merges together the values in all subdirectory CSV files into a single combined tenure CSV file in the archives directory.
 """)
 
 parser.add_argument('--archives', type=str, help='Path to a specified directory of downloaded mail archives', required=True)
 parser.add_argument('-f', '--force', action='store_true', help='Overwrite existing -tenure.csv files; by default this is false and directories with an existing file are skipped.')
 parser.add_argument('-c', '--combine', action='store_true', help='Aggregate values from all subdirectories with existing tenure files into a single CSV.')
 
-args = parser.parse_args()
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("chardet.charsetprober").setLevel(logging.WARNING)
+logging.getLogger("chardet.universaldetector").setLevel(logging.WARNING)
 
-logging.basicConfig(level=logging.INFO)
-
+# these standalone earliest, latest and total_messages methods aren't currently in use, but they'll be useful again soon.
 def earliest(s):
+    """
+    Finds the earliest date from the columns of an activity dataframe that show messages sent per date.
+
+    Takes a pandas.Series where the columns are the dates (and a couple of calculated columns which will be ignored for the purposes of the calculation) and the cells are the number of messages sent on each date.
+    """
     just_dates = s.drop(['Earliest Date', 'Latest Date', 'Total Messages', 'Tenure'], errors='ignore')
     
     earliest = None
@@ -37,14 +46,21 @@ def earliest(s):
         if pd.notna(s['Earliest Date']):
             earliest = s['Earliest Date']
     
-    for i, value in just_dates.iteritems():
-        if value > 0:
-            if earliest == None or i < earliest:
-                earliest = i
-    
-    return earliest
+    # limited to all the dates where the value is greater than 0
+    # then take the array of the dates and calculate the min value
+    earliest_date = just_dates.loc[just_dates > 0].index.min()
+
+    if earliest is not None:
+        if earliest < earliest_date:
+            return earliest
+    return earliest_date
 
 def latest(s):
+    """
+    Finds the latest date from the columns of an activity dataframe that show messages sent per date.
+
+    Takes a pandas.Series where the columns are the dates (and a couple of calculated columns which will be ignored for the purposes of the calculation) and the cells are the number of messages sent on each date.
+    """
     just_dates = s.drop(['Earliest Date', 'Latest Date', 'Total Messages', 'Tenure'], errors='ignore')
     
     latest = None
@@ -53,14 +69,21 @@ def latest(s):
         if pd.notna(s['Latest Date']):
             latest = s['Latest Date']
     
-    for i, value in just_dates.iteritems():
-        if value > 0:
-            if latest == None or i > latest:
-                latest = i
-    
-    return latest
+    # limited to all the dates where the value is greater than 0
+    # then take the array of the dates and calculate the max value
+    latest_date = just_dates.loc[just_dates > 0].index.max()
 
-def total_messages(s): # this is a cumulative sum
+    if latest is not None:
+        if latest > latest_date:
+            return latest
+    return latest_date
+
+def total_messages(s):
+    """
+    Finds the total number of messages sent from an activity dataframe that show messages sent per date.
+
+    Takes a pandas.Series where the columns are the dates (and a couple of calculated columns which will be ignored for the purposes of the calculation) and the cells are the number of messages sent on each date. This does not ignore but instead adds up an existing 'Total Messages' column.
+    """
     just_dates = s.drop(['Earliest Date', 'Latest Date', 'Tenure'], errors='ignore')
     return just_dates.sum()
 
@@ -93,6 +116,8 @@ def main(args):
             logging.info('Completed combined tenure frame output.')
             logging.info('Subdirectories included: %s' % ','.join(combined_lists))
     else:
+        manager = enlighten.get_manager()
+        progress = manager.counter(total=len(subdirectories), desc='Lists', unit='lists')
         for subdirectory in subdirectories:
             logging.info('Processing archives in %s' % subdirectory)
             
@@ -100,24 +125,52 @@ def main(args):
 
             if not args.force:
                 if os.path.isfile(out_path): # if file already exists, skip
+                    progress.update()
                     continue
             try:
+                logging.debug('Opening list archives in %s', subdirectory)
                 archives = mailman.open_list_archives(subdirectory, args.archives)
-                activity = bigbang.archive.Archive(archives).get_activity()
+                
+                logging.debug('Creating archive')
+                archive = bigbang.archive.Archive(archives)
+                
+                logging.debug('Creating activity frame from archive')
+                activity = archive.get_activity()
+                del archive
+                gc.collect()
+
+                logging.debug('Transposing activity frame')
                 person_activity = activity.T
 
-                person_activity['Earliest Date'] = person_activity.apply(earliest, axis='columns')
-                person_activity['Latest Date'] = person_activity.apply(latest, axis='columns')
-                person_activity['Total Messages'] = person_activity.apply(total_messages, axis='columns')
+                logging.debug('Iterating for tenure calculations')
+                earliest_column, latest_column, total_column = [],[],[]
+                i = 0
+                for _, s in person_activity.iterrows():
+                    i = i+1
+                    if i % 100 == 0:
+                        logging.debug("checkpoint: %d", i)
+                        gc.collect()
+                    earliest_date = s.loc[s > 0].index.min()
+                    latest_date = s.loc[s > 0].index.max()
+                    total_messages = s.sum()
+                    earliest_column.append(earliest_date)
+                    latest_column.append(latest_date)
+                    total_column.append(total_messages)
+                index_column = person_activity.index
+                del person_activity
 
                 # delete the other columns
-                person_activity = person_activity[['Earliest Date', 'Latest Date', 'Total Messages']]
+                logging.debug('Create new frame from columns')
+                tenure_frame = pd.DataFrame(index=index_column, data={'Earliest Date':earliest_column,'Latest Date':latest_column,'Total Messages':total_column})
 
+                logging.debug('Writing tenure frame to file')
                 with open(out_path, 'w') as f:
-                    person_activity.to_csv(f, encoding='utf-8')
+                    tenure_frame.to_csv(f, encoding='utf-8')
                     logging.info('Completed tenure frame export for %s' % subdirectory)
             except Exception:
                 logging.warning(('Failed to produce tenure frame export for %s.' % subdirectory), exc_info=True)
+            progress.update()
 
 if __name__ == "__main__":
+    args = parser.parse_args()
     main(args)
