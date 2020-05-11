@@ -4,13 +4,13 @@ coverage
 matplotlib
 graphviz
 networkx
-nose
 pytz
 numpy
-ipython
-ipython-notebook
+jupyter
+notebook
 pandas
 pydot
+pytest
 python-dateutil
 pip
 scipy
@@ -19,3 +19,4 @@ pyyaml
 scikit-learn
 nltk
 testfixtures
+nbconda

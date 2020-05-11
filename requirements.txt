@@ -14,14 +14,13 @@ gitpython
 matplotlib
 networkx
 nltk
-nose
 numpy
 pandas
+pytest
 python-dateutil
 python-Levenshtein
 pytz
 pyzmq
-snakefood
 tornado
 requests
 pyyaml
