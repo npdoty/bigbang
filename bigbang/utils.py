@@ -9,7 +9,7 @@ def labeled_blockmodel(g,partition):
     Keys of *partition* are used to label the nodes of the
     new graph.
     """
-    new_g = nx.blockmodel(g,partition.values())
+    new_g = nx.quotient_graph(g,list(partition.values()),relabel=True)
     labels = dict(enumerate(partition.keys()))
     new_g = nx.relabel_nodes(new_g,labels)
     
@@ -26,7 +26,7 @@ def repartition_dataframe(df,partition):
     """
     df2 = pd.DataFrame(index=df.index)
 
-    for k,v in partition.items():
+    for k,v in list(partition.items()):
         df2[k] = df[v[0]]
     
         for i in range(len(v) - 1):
@@ -59,7 +59,7 @@ def get_common_head(str1,str2,delimiter=None):
 
         return '', 0
     except Exception as e:
-        print e
+        print(e)
         return '', 0
 
 def get_common_foot(str1,str2,delimiter=None):
@@ -89,3 +89,23 @@ def clean_message(mess):
 
     return mess
 
+
+# From here:
+# https://stackoverflow.com/questions/46217529/pandas-datetimeindex-frequency-is-none-and-cant-be-set
+def add_freq(idx, freq=None):
+    """Add a frequency attribute to idx, through inference or directly.
+
+    Returns a copy.  If `freq` is None, it is inferred.
+    """
+
+    idx = idx.copy()
+    if freq is None:
+        if idx.freq is None:
+            freq = pd.infer_freq(idx)
+        else:
+            return idx
+    idx.freq = pd.tseries.frequencies.to_offset(freq)
+    if idx.freq is None:
+        raise AttributeError('no discernible frequency found to `idx`.  Specify'
+                             ' a frequency string with `freq`.')
+    return idx

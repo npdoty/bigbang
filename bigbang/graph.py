@@ -1,4 +1,4 @@
-from . import parse
+import bigbang.parse as parse
 import math
 import numpy as np
 import networkx as nx
@@ -10,6 +10,7 @@ import pandas
 
 
 def messages_to_reply_graph(messages):
+    """Return a graph given messages."""
 
     G = nx.DiGraph()
 
@@ -32,13 +33,16 @@ def messages_to_reply_graph(messages):
 
 
 def messages_to_interaction_graph(messages, verbose=False,clean=True):
+    """Return a interactable graph given messages."""
 
     IG = nx.DiGraph()
 
     from_dict = {}
-
+    
     sender_counts = {}
     reply_counts = {}
+
+ 
 
     if not isinstance(messages, pandas.core.frame.DataFrame):
         df = process.messages_to_dataframe(messages)
@@ -47,7 +51,6 @@ def messages_to_interaction_graph(messages, verbose=False,clean=True):
 
     for m in df.iterrows():
         m_from = m[1]['From']
-
         if clean:
             m_from = parse.clean_from(m_from)
 
@@ -57,7 +60,7 @@ def messages_to_interaction_graph(messages, verbose=False,clean=True):
         reply_counts[m_from] = reply_counts.get(m_from, {})
         IG.add_node(m_from)
 
-    for sender, count in sender_counts.items():
+    for sender, count in list(sender_counts.items()):
         IG.node[sender]['sent'] = count
 
     replies = [m for m in df.iterrows() if m[1]['In-Reply-To'] is not None]
@@ -75,17 +78,17 @@ def messages_to_interaction_graph(messages, verbose=False,clean=True):
             reply_counts[m_from][m_to] = reply_counts[m_from].get(m_to, 0) + 1
         else:
             if verbose:
-                print reply_to_mid + " not in archive"
+                print(reply_to_mid + " not in archive")
 
-    for m_from, edges in reply_counts.items():
-        for m_to, count in edges.items():
+    for m_from, edges in list(reply_counts.items()):
+        for m_to, count in list(edges.items()):
             IG.add_edge(m_from, m_to, weight=count)
 
     return IG
 
 
-# turn an interaction graph into a weighted edge matrix
 def interaction_graph_to_matrix(dg):
+    """Turn an interaction graph into a weighted edge matrix."""
     nodes = dg.nodes()
 
     n_nodes = len(nodes)
@@ -101,10 +104,12 @@ def interaction_graph_to_matrix(dg):
 
     return matrix
 
-
-# Ulanowicz ecosystem health measures
-# input is weighted adjacency matrix
 def ascendancy(am):
+    """
+    Ulanowicz ecosystem health measures
+    Input is weighted adjacency matrix.
+    """
+
     # total system throughput
     tst = np.sum(am)
 
@@ -123,6 +128,7 @@ def ascendancy(am):
 
 
 def capacity(am):
+    """Return the capacity given a adjacency matrix."""
     # total system throughput
     tst = np.sum(am)
 
@@ -132,6 +138,7 @@ def capacity(am):
 
 
 def overhead(am):
+    """Return overhead given a adjacency matrix."""
     # could be more efficient...
     return capacity(am) - ascendancy(am)
 
@@ -140,6 +147,8 @@ def overhead(am):
 
 
 def compute_ascendancy(messages, duration=50):
+    """Compute ascendancy given messages."""
+
     print('compute ascendancy')
     dated_messages = {}
 
@@ -151,7 +160,7 @@ def compute_ascendancy(messages, duration=50):
             dated_messages[o] = dated_messages.get(o, [])
             dated_messages[o].append(m)
 
-    days = [k for k in dated_messages.keys()]
+    days = [k for k in list(dated_messages.keys())]
     day_offset = min(days)
     epoch = max(days) - min(days)
 

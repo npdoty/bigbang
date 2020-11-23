@@ -1,14 +1,15 @@
-import datetime
-import mailman
-import mailbox
-import numpy as np
-from bigbang.thread import Thread
 from bigbang.thread import Node
+from bigbang.thread import Thread
+from config.config import CONFIG
 import bigbang.process as process
+import datetime
+import mailbox
+from . import mailman
+import numpy as np
 import pandas as pd
 import pytz
-import utils
-
+from . import utils
+import logging
 
 def load(path):
     data = pd.read_csv(path)
@@ -16,19 +17,16 @@ def load(path):
 
 
 class Archive(object):
-
-    """
-    A representation of a mailing list archive.
-    """
+    """A representation of a mailing list archive."""
 
     data = None
     activity = None
     threads = None
     entities = None
 
-    def __init__(self, data, archive_dir="archives", mbox=False):
+    def __init__(self, data, archive_dir=CONFIG.mail_path, mbox=False):
         """
-        Initializes an Archive object.
+        Initialize an Archive object.
 
         The behavior of the constructor depends on the type
         of its first argument, data.
@@ -51,15 +49,30 @@ class Archive(object):
             self.data = data.copy()
         elif isinstance(data, str):
             self.data = mailman.load_data(data,archive_dir=archive_dir,mbox=mbox)
-         
-        self.data['Date'] = pd.to_datetime(self.data['Date'], utc=True)
-        self.data.drop_duplicates(inplace=True)
+        
+        try:
+            self.data['Date'] = pd.to_datetime(self.data['Date'], errors='coerce', infer_datetime_format=True, utc=True)
+        except:
+            #TODO: writing a CSV file was for debugging purposes, should be removed
+            out_path = 'datetime-exception.csv'
+            with open(out_path, 'w') as f:
+                self.data.to_csv(f, encoding='utf-8')
+            
+            logging.error('Error while converting to datetime, despite coerce mode.')
+            raise
+
+        try:
+            self.data.drop_duplicates(inplace=True)
+        except:
+            logging.error('Error while removing duplicate messages, maybe timezone issues?', exc_info=True)
 
         # Drops any entries with no Date field.
         # It may be wiser to optionally
         # do interpolation here.
         if self.data['Date'].isnull().any():
-            self.data.dropna(subset=['Date'], inplace=True)
+            #self.data.dropna(subset=['Date'], inplace=True)
+            self.data = self.data[self.data['Date'].notnull()]
+            # workaround for https://github.com/pandas-dev/pandas/issues/13407
 
         #convert any null fields to None -- csv saves these as nan sometimes
         self.data = self.data.where(pd.notnull(self.data),None)
@@ -71,11 +84,30 @@ class Archive(object):
             #will get KeyError if Message-ID is already index
             pass
 
-        self.data.sort_values(by='Date', inplace=True)
+        # let's do a pass to try to find bad tzinfo's
+        bad_indices = []
+        for i, row in self.data.iterrows():
+            try:
+                future_comparison = row['Date'] < datetime.datetime.now(pytz.utc)
+            except:
+                logging.error('Error timezone issues while detecting bad rows', exc_info=True)
+                bad_indices.append(i)
+                logging.info('Bad timezone on %s', row['Date'])
+        if len(bad_indices) > 0:
+            # drop those rows that threw an error
+            self.data = self.data.drop(bad_indices)
+            logging.info('Dropped %d rows', len(bad_indices))
 
+        try:
+            self.data.sort_values(by='Date', inplace=True)
+        except:
+            logging.error('Error while sorting, maybe timezone issues?', exc_info=True)
         
+        if self.data.empty:
+            raise mailman.MissingDataException('Archive after initial processing is empty. Was data collected properly?')
 
     def resolve_entities(self,inplace=True):
+        """Return data with resolved entities."""
         if self.entities is None:
             if self.activity is None:
                 self.get_activity()
@@ -86,7 +118,7 @@ class Archive(object):
 
         value = []
 
-        for e, names in self.entities.items():
+        for e, names in list(self.entities.items()):
             for n in names:
                 to_replace.append(n)
                 value.append(e)
@@ -105,6 +137,7 @@ class Archive(object):
     def get_activity(self,resolved=False):
         """
         Get the activity matrix of an Archive.
+
         Columns of the returned DataFrame are the Senders of emails.
         Rows are indexed by ordinal date.
         Cells are the number of emails sent by each sender on each data.
@@ -124,9 +157,10 @@ class Archive(object):
         return self.activity
 
     def compute_activity(self, clean=True):
+        """Return the computed activity."""
         mdf = self.data
 
-	if clean:
+        if clean:
             # unnecessary?
             if mdf['Date'].isnull().any():
                 mdf = mdf.dropna(subset=['Date'])
@@ -147,6 +181,7 @@ class Archive(object):
         return activity
 
     def get_threads(self, verbose=False):
+        """Get threads."""
 
         if self.threads is not None:
             return self.threads
@@ -164,13 +199,13 @@ class Archive(object):
             if verbose:
                 c += 1
                 if c % 1000 == 0:
-                    print "Processed %d of %d" %(c,total)
+                    print("Processed %d of %d" %(c,total))
 
-            if(i[1]['In-Reply-To'] is None):
+            if(i[1]['In-Reply-To'] == 'None'):
                 root = Node(i[0], i[1])
                 visited[i[0]] = root
                 threads.append(Thread(root))
-            elif(i[1]['In-Reply-To'] not in visited.keys()):
+            elif(i[1]['In-Reply-To'] not in list(visited.keys())):
                 root = Node(i[1]['In-Reply-To'])
                 succ = Node(i[0],i[1], root)
                 root.add_successor(succ)
@@ -188,12 +223,14 @@ class Archive(object):
         return threads
 
     def save(self, path,encoding='utf-8'):
+        """Save data to csv file."""
         self.data.to_csv(path, ",",encoding=encoding)
 
 
 def find_footer(messages,number=1):
     '''
     Returns the footer of a DataFrame of emails.
+
     A footer is a string occurring at the tail of most messages.
     Messages can be a DataFrame or a Series
     '''
@@ -208,8 +245,6 @@ def find_footer(messages,number=1):
     counts = {}
 
     last = None
-    last_i = None
-    current = None
 
     def clean_footer(foot):
         return foot.strip()
@@ -234,12 +269,12 @@ def find_footer(messages,number=1):
 
     # reduce candidates that are strictly longer and less frequent
     # than most promising footer candidates
-    for n,foot1 in sorted([(v,k) for k,v in counts.items()],reverse=True):
-        for foot2, m in counts.items():
+    for n,foot1 in sorted([(v,k) for k,v in list(counts.items())],reverse=True):
+        for foot2, m in list(counts.items()):
             if n > m and foot1 in foot2 and len(foot1) > 0:
                 counts[foot1] = counts[foot1] + counts[foot2]
                 del counts[foot2]
 
-    candidates = sorted([(v,k) for k,v in counts.items()],reverse=True)
+    candidates = sorted([(v,k) for k,v in list(counts.items())],reverse=True)
 
     return candidates[0:number]
