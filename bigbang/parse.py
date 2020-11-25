@@ -93,6 +93,9 @@ def tokenize_name(clean_name):
     Takes a Unicode name already cleaned of most punctuation and spurious characters, hopefully.
     """
 
+    if clean_name == None:
+        return None
+
     # make lower case, remove "." and ",", tokenize and lexicographically sort the tokens, join by spaces, return as a string
 
     stop_characters = str('".,')
@@ -114,6 +117,9 @@ def guess_first_name(cleaned_from):
     (from a 'From' field). This may or may not be the given name. Returns None
     if heuristic doesn't recognize a separable first name.
     """
+    
+    if cleaned_from == None:
+        return None
     
     cleaned_from = cleaned_from.strip() # remove leading and trailing whitespace
     
